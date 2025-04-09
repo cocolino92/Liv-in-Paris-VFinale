@@ -29,6 +29,8 @@ class Program
             Console.WriteLine("1. Connexion");
             Console.WriteLine("2. Créer un compte");
             Console.WriteLine("3. Quitter");
+            Console.WriteLine("4) Test chemin, dessin chemin, distance et temps");
+
             Console.Write("Choisissez une option : ");
             string choix = Console.ReadLine();
 
@@ -43,12 +45,111 @@ class Program
                 case "3":
                     Console.WriteLine("Au revoir !");
                     return;
+                case "4":
+
+                    // Initialisation et chargement des données
+                    var graphe = new Graphe<string>();
+                    var noeuds = ChargerNoeuds("MetroParis(1).xlsx");
+                    var arcs = ChargerArcs("MetroParis(1).xlsx", noeuds);
+
+                    foreach (var noeud in noeuds.Values) graphe.AjouterNoeud(noeud);
+                    foreach (var arc in arcs) graphe.AjouterLien(arc.Item1, arc.Item2, arc.Item3);
+
+                    // Menu interactif
+                    while (true)
+                    {
+                        Console.Clear();
+                        Console.WriteLine("=== PLANIFICATEUR DE TRAJET MÉTRO PARISIEN ===");
+                        Console.WriteLine("\n1. Rechercher un trajet");
+                        Console.WriteLine("2. Quitter");
+                        Console.Write("\nVotre choix : ");
+
+                        string choix2 = Console.ReadLine();
+
+                        if (choix2 == "2") break;
+
+                        if (choix2 == "1")
+                        {
+                            Console.WriteLine("\nAlgorithmes disponibles :");
+                            Console.WriteLine("1. Dijkstra (recommandé)");
+                            Console.WriteLine("2. Bellman-Ford");
+                            Console.WriteLine("3. Floyd-Marshall");
+                            Console.Write("\nChoisissez un algorithme (1-3) : ");
+                            string choixAlgo = Console.ReadLine();
+
+                            List<Noeud<string>> chemin = null;
+                            string algoUtilisé = "";
+                            Console.WriteLine("De quelle station partez-vous ?");
+                            var nomdépart = Console.ReadLine()?.Trim().ToUpper();
+                            var départ = noeuds.Values.FirstOrDefault(n => n.Libelle.ToUpper().Contains(nomdépart));
+
+                            if (départ == null)
+                            {
+                                Console.WriteLine($"Aucune station contenant '{nomdépart}' n'a été trouvée.");
+                                continue; // ou return selon votre flux
+                            }
+
+                            Console.WriteLine("Vers quelle station allez-vous ?");
+                            var nomarrivée = Console.ReadLine()?.Trim().ToUpper();
+                            var arrivée = noeuds.Values.FirstOrDefault(n => n.Libelle.ToUpper().Contains(nomarrivée));
+
+                            if (arrivée == null)
+                            {
+                                Console.WriteLine($"Aucune station contenant '{nomarrivée}' n'a été trouvée.");
+                                continue; // ou return selon votre flux
+                            }
+                            switch (choixAlgo)
+                            {
+                                case "1":
+                                    chemin = Chemin<string>.Dijsktra(graphe, départ, arrivée);
+                                    algoUtilisé = "Dijkstra";
+                                    break;
+                                case "2":
+                                    var distancesBF = Chemin<string>.BellmanFord(graphe, départ);
+                                    chemin = Chemin<string>.ReconstruireCheminBellmanFord(distancesBF, graphe, départ, arrivée);
+                                    algoUtilisé = "Bellman-Ford";
+                                    break;
+                                case "3":
+
+                                    var (distancesFW, predecesseursFW) = Chemin<string>.FloydWarshall(graphe);
+                                    chemin = Chemin<string>.ReconstruireCheminFloydWarshall(predecesseursFW, départ, arrivée);
+                                    algoUtilisé = "Floyd-Warshall";
+                                    break;
+                                default:
+                                    Console.WriteLine("Choix invalide, utilisation de Dijkstra par défaut.");
+                                    chemin = Chemin<string>.Dijsktra(graphe, départ, arrivée);
+                                    algoUtilisé = "Dijkstra";
+                                    break;
+                            }
+
+                            // Affichage des résultats
+                            if (chemin.Count > 0)
+                            {
+                                Console.WriteLine($"\n CHEMIN TROUVÉ ({chemin.Count} stations) - Algorithme: {algoUtilisé}");
+                                AfficherChemin(chemin);
+                                graphe.AfficherGraphe("metro_paris_chemin.png", chemin);
+                                Process.Start(new ProcessStartInfo { FileName = "metro_paris_chemin.png", UseShellExecute = true });
+                            }
+                            else
+                            {
+                                Console.WriteLine("\nAUCUN CHEMIN TROUVÉ");
+                                Console.WriteLine($"Entre {départ.Libelle} et {arrivée.Libelle}");
+                                Process.Start(new ProcessStartInfo { FileName = "metro_paris.png", UseShellExecute = true });
+                            }
+
+                            Console.WriteLine("\nAppuyez sur une touche pour continuer...");
+                            Console.ReadKey();
+                        }
+                    }
+                    break;
+
                 default:
                     Console.WriteLine("Option invalide, veuillez réessayer.");
                     break;
             }
         }
     }
+
 
 
     /// <summary>
@@ -58,55 +159,75 @@ class Program
     {
         while (true)
         {
-            // demande des identifiants
             Console.Write("\nEmail : ");
             string email = Console.ReadLine();
-            Console.Write("Mot de passe : ");
-            string mdp = Console.ReadLine();
 
-            // connexion à la base
+            Console.Write("Mot de passe : ");
+            string password = Console.ReadLine();
+
             using (MySqlConnection connection = new MySqlConnection(connectionString))
             {
                 connection.Open();
-                // vérifie les identifiants dans les deux tables
-                string requeteSql = @"SELECT 'Client' AS Role, idClient AS idUtilisateur, nom, prenom  FROM Client WHERE email = @Email AND motDePasse = @mdp
-                                  UNION
-                                  SELECT 'Cuisinier', idCuisinier AS idUtilisateur, nom, prenom FROM Cuisinier WHERE email = @Email AND motDePasse = @mdp";
 
-                MySqlCommand commandesql = new MySqlCommand(requeteSql, connection);
-                commandesql.Parameters.AddWithValue("@Email", email); // paramètre sécurisé
-                commandesql.Parameters.AddWithValue("@mdp", mdp);
+                // Test Admin
+                string queryAdmin = "SELECT * FROM Admin WHERE email = @Email AND motDePasse = @Password";
+                MySqlCommand cmdAdmin = new MySqlCommand(queryAdmin, connection);
+                cmdAdmin.Parameters.AddWithValue("@Email", email);
+                cmdAdmin.Parameters.AddWithValue("@Password", password);
 
-                using (MySqlDataReader lecteur = commandesql.ExecuteReader())
+                using (MySqlDataReader reader = cmdAdmin.ExecuteReader())
                 {
-                    if (lecteur.Read()) // si un utilisateur est trouvé
+                    if (reader.Read())
                     {
-                        string role = lecteur["Role"].ToString();
-                        int idUtilisateur = Convert.ToInt32(lecteur["idUtilisateur"]);
-                        string prenom = lecteur["prenom"].ToString();
-                        string nom = lecteur["nom"].ToString();
-
-                        // message de bienvenue
-                        Console.WriteLine($"\nBienvenue, {prenom} {nom} ({role}) !");
-                        lecteur.Close();
-
-
-                        // redirige vers le bon menu
-                        if (role == "Client")
-                            MenuClient(idUtilisateur);
-                        else
-                            MenuCuisinier(idUtilisateur);
-
-                        return; // sortie de la méthode après connexion
-                    }
-                    else
-                    {
-                        Console.WriteLine("Email ou mot de passe incorrect.");
+                        Console.WriteLine($"\nBienvenue Admin {reader["prenom"]} {reader["nom"]} !");
+                        reader.Close();
+                        
+                        Admin.MenuAdmin();
+                        return;
                     }
                 }
+
+                // Test Client
+                string queryClient = "SELECT * FROM Client WHERE email = @Email AND motDePasse = @Password";
+                MySqlCommand cmdClient = new MySqlCommand(queryClient, connection);
+                cmdClient.Parameters.AddWithValue("@Email", email);
+                cmdClient.Parameters.AddWithValue("@Password", password);
+
+                using (MySqlDataReader reader = cmdClient.ExecuteReader())
+                {
+                    if (reader.Read())
+                    {
+                        int idClient = Convert.ToInt32(reader["idClient"]);
+                        Console.WriteLine($"\nBienvenue {reader["prenom"]} {reader["nom"]} (Client) !");
+                        reader.Close();
+                        MenuClient(idClient);
+                        return;
+                    }
+                }
+
+                // Test Cuisinier
+                string queryCuisinier = "SELECT * FROM Cuisinier WHERE email = @Email AND motDePasse = @Password";
+                MySqlCommand cmdCuisinier = new MySqlCommand(queryCuisinier, connection);
+                cmdCuisinier.Parameters.AddWithValue("@Email", email);
+                cmdCuisinier.Parameters.AddWithValue("@Password", password);
+
+                using (MySqlDataReader reader = cmdCuisinier.ExecuteReader())
+                {
+                    if (reader.Read())
+                    {
+                        int idCuisinier = Convert.ToInt32(reader["idCuisinier"]);
+                        Console.WriteLine($"\nBienvenue {reader["prenom"]} {reader["nom"]} (Cuisinier) !");
+                        reader.Close();
+                        MenuCuisinier(idCuisinier);
+                        return;
+                    }
+                }
+
+                Console.WriteLine("Email ou mot de passe incorrect. Veuillez réessayer !");
             }
         }
     }
+
 
     /// <summary>
     /// permet à un utilisateur de créer un compte client ou cuisinier
@@ -192,6 +313,8 @@ class Program
             Console.WriteLine(rowsAffected > 0 ? "Compte créé avec succès !" : "Erreur lors de la création du compte.");
         }
     }
+
+
 
 
     /// <summary>
@@ -1179,4 +1302,6 @@ class Admin
         }
     }
 }
+
+
 
