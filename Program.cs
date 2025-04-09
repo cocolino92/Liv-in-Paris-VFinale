@@ -1199,9 +1199,9 @@ class Admin
         while (true)
         {
             Console.WriteLine("\n--- Menu Administrateur ---");
-            Console.WriteLine("1. Voir tous les clients");
-            Console.WriteLine("2. Voir tous les cuisiniers");
-            Console.WriteLine("3. Voir toutes les commandes");
+            Console.WriteLine("1. Gérer les clients");
+            Console.WriteLine("2. Gérer les cuisiniers");
+            Console.WriteLine("3. Gérer les commandes");
             Console.WriteLine("4. Voir tous les plats");
             Console.WriteLine("5. Quitter");
             Console.Write("Choisissez une option : ");
@@ -1210,13 +1210,13 @@ class Admin
             switch (choix)
             {
                 case "1":
-                    VoirTousLesClients();
+                    GérerClients();
                     break;
                 case "2":
-                    VoirTousLesCuisiniers();
+                    GérerCuisiniers();
                     break;
                 case "3":
-                    VoirToutesLesCommandes();
+                    GérerCommandes();
                     break;
                 case "4":
                     VoirTousLesPlats();
@@ -1230,56 +1230,140 @@ class Admin
         }
     }
 
-    static void VoirTousLesClients()
+    static void GérerClients()
     {
-        using (MySqlConnection connection = new MySqlConnection(Program.connectionString))
+        Console.WriteLine("\n--- Tous les Clients ---");
+        using (var connection = new MySqlConnection(Program.connectionString))
         {
             connection.Open();
-            string query = "SELECT * FROM Client";
-            MySqlCommand command = new MySqlCommand(query, connection);
-            using (MySqlDataReader reader = command.ExecuteReader())
+            var cmd = new MySqlCommand("SELECT * FROM Client", connection);
+            using (var reader = cmd.ExecuteReader())
             {
-                Console.WriteLine("\n--- Tous les Clients ---");
                 while (reader.Read())
                 {
                     Console.WriteLine($"ID: {reader["idClient"]}, Nom: {reader["nom"]}, Email: {reader["email"]}");
                 }
             }
+
+            Console.Write("\nSouhaitez-vous modifier (m) ou supprimer (s) un client ? (ou Entrée pour revenir) : ");
+            string action = Console.ReadLine().ToLower();
+
+            if (action == "m")
+            {
+                Console.Write("ID du client à modifier : ");
+                int id = int.Parse(Console.ReadLine());
+                Console.Write("Nouveau nom : ");
+                string nouveauNom = Console.ReadLine();
+
+                var update = new MySqlCommand("UPDATE Client SET nom = @nom WHERE idClient = @id", connection);
+                update.Parameters.AddWithValue("@nom", nouveauNom);
+                update.Parameters.AddWithValue("@id", id);
+                update.ExecuteNonQuery();
+
+                Console.WriteLine("Client modifié.");
+            }
+            else if (action == "s")
+            {
+                Console.Write("ID du client à supprimer : ");
+                int id = int.Parse(Console.ReadLine());
+
+                var delete = new MySqlCommand("DELETE FROM Client WHERE idClient = @id", connection);
+                delete.Parameters.AddWithValue("@id", id);
+                delete.ExecuteNonQuery();
+
+                Console.WriteLine("Client supprimé.");
+            }
         }
     }
 
-    static void VoirTousLesCuisiniers()
+    static void GérerCuisiniers()
     {
-        using (MySqlConnection connection = new MySqlConnection(Program.connectionString))
+        Console.WriteLine("\n--- Tous les Cuisiniers ---");
+        using (var connection = new MySqlConnection(Program.connectionString))
         {
             connection.Open();
-            string query = "SELECT * FROM Cuisinier";
-            MySqlCommand command = new MySqlCommand(query, connection);
-            using (MySqlDataReader reader = command.ExecuteReader())
+            var cmd = new MySqlCommand("SELECT * FROM Cuisinier", connection);
+            using (var reader = cmd.ExecuteReader())
             {
-                Console.WriteLine("\n--- Tous les Cuisiniers ---");
                 while (reader.Read())
                 {
                     Console.WriteLine($"ID: {reader["idCuisinier"]}, Nom: {reader["nom"]}, Email: {reader["email"]}");
                 }
             }
+
+            Console.Write("\nSouhaitez-vous modifier (m) ou supprimer (s) un cuisinier ? (ou Entrée pour revenir) : ");
+            string action = Console.ReadLine().ToLower();
+
+            if (action == "m")
+            {
+                Console.Write("ID du cuisinier à modifier : ");
+                int id = int.Parse(Console.ReadLine());
+                Console.Write("Nouveau nom : ");
+                string nouveauNom = Console.ReadLine();
+
+                var update = new MySqlCommand("UPDATE Cuisinier SET nom = @nom WHERE idCuisinier = @id", connection);
+                update.Parameters.AddWithValue("@nom", nouveauNom);
+                update.Parameters.AddWithValue("@id", id);
+                update.ExecuteNonQuery();
+
+                Console.WriteLine("Cuisinier modifié.");
+            }
+            else if (action == "s")
+            {
+                Console.Write("ID du cuisinier à supprimer : ");
+                int id = int.Parse(Console.ReadLine());
+
+                var delete = new MySqlCommand("DELETE FROM Cuisinier WHERE idCuisinier = @id", connection);
+                delete.Parameters.AddWithValue("@id", id);
+                delete.ExecuteNonQuery();
+
+                Console.WriteLine("Cuisinier supprimé.");
+            }
         }
     }
 
-    static void VoirToutesLesCommandes()
+    static void GérerCommandes()
     {
-        using (MySqlConnection connection = new MySqlConnection(Program.connectionString))
+        Console.WriteLine("\n--- Toutes les Commandes ---");
+        using (var connection = new MySqlConnection(Program.connectionString))
         {
             connection.Open();
-            string query = "SELECT * FROM Commande";
-            MySqlCommand command = new MySqlCommand(query, connection);
-            using (MySqlDataReader reader = command.ExecuteReader())
+            var cmd = new MySqlCommand("SELECT * FROM Commande", connection);
+            using (var reader = cmd.ExecuteReader())
             {
-                Console.WriteLine("\n--- Toutes les Commandes ---");
                 while (reader.Read())
                 {
-                    Console.WriteLine($"Commande #{reader["idCommande"]} - Nom: {reader["nom"]}, Prix: {reader["prix"]}, Client ID: {reader["idClient"]}, Cuisinier ID: {reader["idCuisinier"]}");
+                    Console.WriteLine($"Commande #{reader["idCommande"]} - Nom: {reader["nom"]}, Prix: {reader["prix"]}, Client ID: {reader["idClient"]}");
                 }
+            }
+
+            Console.Write("\nSouhaitez-vous modifier (m) ou supprimer (s) une commande ? (ou Entrée pour revenir) : ");
+            string action = Console.ReadLine().ToLower();
+
+            if (action == "m")
+            {
+                Console.Write("ID de la commande à modifier : ");
+                int id = int.Parse(Console.ReadLine());
+                Console.Write("Nouveau statut : ");
+                string nouveauStatut = Console.ReadLine();
+
+                var update = new MySqlCommand("UPDATE Commande SET statut = @statut WHERE idCommande = @id", connection);
+                update.Parameters.AddWithValue("@statut", nouveauStatut);
+                update.Parameters.AddWithValue("@id", id);
+                update.ExecuteNonQuery();
+
+                Console.WriteLine("Commande modifiée.");
+            }
+            else if (action == "s")
+            {
+                Console.Write("ID de la commande à supprimer : ");
+                int id = int.Parse(Console.ReadLine());
+
+                var delete = new MySqlCommand("DELETE FROM Commande WHERE idCommande = @id", connection);
+                delete.Parameters.AddWithValue("@id", id);
+                delete.ExecuteNonQuery();
+
+                Console.WriteLine("Commande supprimée.");
             }
         }
     }
@@ -1302,6 +1386,7 @@ class Admin
         }
     }
 }
+
 
 
 
