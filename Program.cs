@@ -1,5 +1,3 @@
-
-
 using System;
 using System.Collections.Generic;
 using System.Data.OleDb;
@@ -8,7 +6,7 @@ using System.Linq;
 using SkiaSharp;
 using MySql.Data.MySqlClient;
 using System.Diagnostics;
-using Org.BouncyCastle.Tls;
+using psi_rendu;
 
 
 
@@ -182,7 +180,7 @@ class Program
                     {
                         Console.WriteLine($"\nBienvenue Admin {reader["prenom"]} {reader["nom"]} !");
                         reader.Close();
-                        
+
                         Admin.MenuAdmin();
                         return;
                     }
@@ -288,7 +286,7 @@ class Program
             }
             else if (role == "2") // Cuisinier
             {
-                query = "INSERT INTO Cuisinier (nom, prenom, email, motDePasse, rue, numMaison, codePostal, numTel, ville, totalCommande, metroProche) " +
+                query = "INSERT INTO Cuisinier (nom, prenom, email, motDePasse, rue, numMaison, codePostal, numTel, ville, totalCommande, @metroProche) " +
                         "VALUES (@Nom, @Prenom, @Email, @Password, @rue, @numMaison, @codePostal, @numTel, @ville, @totalCommande, @metroProche)";
             }
             else
@@ -399,7 +397,7 @@ class Program
                     Mettreàjourcommande(); // mise à jour du statut d'une commande
                     break;
                 case "6":
-                    VoirCommandesRealisees(idCuisinier); // voir commandes terminées
+                    VoirCommandesRealisee(idCuisinier); // voir commandes terminées
                     break;
                 case "7":
                     CalculerCheminVersClient(idCuisinier);
@@ -917,44 +915,36 @@ WHERE commande.idCuisinier = @idCuisinier AND commande.statut = 'en attente'
     /// Affiche les commandes déjà réalisées par un cuisinier 
     /// </summary>
     /// <param name="idCuisinier"></param>
-
-    static void VoirCommandesRealisees(int idCuisinier)
+    static void VoirCommandesRealisee(int idCuisinier)
     {
         using (MySqlConnection connection = new MySqlConnection(connectionString))
         {
             connection.Open();
 
-            string requete = @"
-            SELECT commande.idCommande, commande.nom, commande.prix, commande.date, commande.statut, commande.commentaire,
-                   client.nom AS nomClient, client.prenom, client.metroProche
-            FROM commande
-            JOIN client ON commande.idClient = client.idClient
-            WHERE commande.idCuisinier = @idCuisinier AND commande.statut != 'en attente'
-            ORDER BY commande.date DESC";
+            string requetesql = "SELECT idCommande, nom, prix, statut, date, idClient, commentaire FROM commande WHERE (idCuisinier = @idCuisinier) not in (commande.statut='en attente')";
 
-            MySqlCommand command = new MySqlCommand(requete, connection);
-            command.Parameters.AddWithValue("@idCuisinier", idCuisinier);
+            MySqlCommand commandesql = new MySqlCommand(requetesql, connection);
+            commandesql.Parameters.AddWithValue("@idCuisinier", idCuisinier);
 
-            using (MySqlDataReader reader = command.ExecuteReader())
+            using (MySqlDataReader lecteur = commandesql.ExecuteReader())
             {
-                if (!reader.HasRows)
+                if (!lecteur.HasRows)
                 {
-                    Console.WriteLine("Aucune commande réalisée trouvée.");
+                    Console.WriteLine("Aucune commande réalisée.");
                     return;
                 }
 
-                Console.WriteLine("\n--- Commandes Réalisées ---");
-                while (reader.Read())
+                Console.WriteLine("\nCommandes à préparer :");
+                while (lecteur.Read())
                 {
-                    Console.WriteLine($"\nCommande #{reader["idCommande"]} - {reader["nom"]} - {reader["prix"]} euro");
-                    Console.WriteLine($"Client : {reader["prenom"]} {reader["nomClient"]} | Métro : {reader["metroProche"]}");
-                    Console.WriteLine($"Date : {reader["date"]} | Statut : {reader["statut"]}");
-                    Console.WriteLine($"Commentaire : {reader["commentaire"]}");
+                    Console.WriteLine($"Commande #{lecteur["idCommande"]} - {lecteur["nom"]} - {lecteur["prix"]} euro");
+                    Console.WriteLine($"Client: {lecteur["idClient"]} | Statut: {lecteur["statut"]} | Date: {lecteur["date"]}");
+                    Console.WriteLine($"Commentaire: {lecteur["commentaire"]}\n");
                 }
             }
+            connection.Close();
         }
     }
-
 
     /// <summary>
     /// met à jour le statut d'une commande
@@ -989,7 +979,7 @@ WHERE commande.idCuisinier = @idCuisinier AND commande.statut = 'en attente'
     /// </summary>
     /// <param name="fichierExcel"></param>
     /// <returns></returns>
-    
+
 
     static double DegresToRadians(double deg) => deg * (Math.PI / 180);
     static double CalculerDistanceHaversine(double lat1, double lon1, double lat2, double lon2)
@@ -1147,7 +1137,8 @@ WHERE commande.idCuisinier = @idCuisinier AND commande.statut = 'en attente'
         }
     }
 
-    static Dictionary<int, Noeud<string>> ChargerNoeuds(string fichierExcel)
+    // Ajouter cette méthode statique à la classe Program pour rendre ChargerNoeuds accessible depuis ExportData
+    public static Dictionary<int, Noeud<string>> ChargerNoeuds(string fichierExcel)
     {
         var noeuds = new Dictionary<int, Noeud<string>>();
         var stationsParNom = new Dictionary<string, List<Noeud<string>>>();
@@ -1212,6 +1203,7 @@ WHERE commande.idCuisinier = @idCuisinier AND commande.statut = 'en attente'
     static List<Tuple<Noeud<string>, Noeud<string>, double>> ChargerArcs(string fichierExcel, Dictionary<int, Noeud<string>> noeuds)
     {
         var arcs = new HashSet<Tuple<Noeud<string>, Noeud<string>, double>>(new ArcEqualityComparer());
+
         string connectionString = $"Provider=Microsoft.ACE.OLEDB.12.0;Data Source={fichierExcel};Extended Properties='Excel 12.0;HDR=YES;IMEX=1'";
 
         using (OleDbConnection connection = new OleDbConnection(connectionString))
@@ -1291,9 +1283,11 @@ WHERE commande.idCuisinier = @idCuisinier AND commande.statut = 'en attente'
     }
 }
 
-class Admin
+
+
+public class Admin
 {
-    public static void MenuAdmin()
+   public static void MenuAdmin()
     {
         while (true)
         {
@@ -1302,7 +1296,7 @@ class Admin
             Console.WriteLine("2. Gérer les cuisiniers");
             Console.WriteLine("3. Gérer les commandes");
             Console.WriteLine("4. Voir tous les plats");
-            Console.WriteLine("5.Statstistiques");
+            Console.WriteLine("5. Exporter les données");
             Console.WriteLine("6. Quitter");
             Console.Write("Choisissez une option : ");
             string choix = Console.ReadLine();
@@ -1322,9 +1316,8 @@ class Admin
                     VoirTousLesPlats();
                     break;
                 case "5":
-                    Statistiques.MenuStatistiques();
+                    MenuExportation();
                     break;
-
                 case "6":
                     return;
                 default:
@@ -1334,6 +1327,64 @@ class Admin
         }
     }
 
+    static void MenuExportation()
+    {
+        while (true)
+        {
+            Console.WriteLine("\n--- Menu Exportation ---");
+            Console.WriteLine("1. Exporter les clients");
+            Console.WriteLine("2. Exporter les cuisiniers");
+            Console.WriteLine("3. Exporter les plats");
+            Console.WriteLine("4. Exporter les commandes");
+            Console.WriteLine("5. Retour au menu principal");
+            Console.Write("Choisissez une option : ");
+            string choix = Console.ReadLine();
+
+            if (choix == "5") return;
+
+            Console.WriteLine("\nFormat d'exportation :");
+            Console.WriteLine("1. JSON");
+            Console.WriteLine("2. XML");
+            Console.Write("Choisissez un format : ");
+            string format = Console.ReadLine();
+
+            Console.Write("\nNom du fichier de sortie (sans extension) : ");
+            string fileName = Console.ReadLine();
+
+            switch (choix)
+            {
+                case "1": // Clients
+                    if (format == "1")
+                        ExportData.ExportClientsToJson($"{fileName}.json");
+                    else if (format == "2")
+                        ExportData.ExportClientsToXml($"{fileName}.xml");
+                    break;
+                case "2": // Cuisiniers
+                    if (format == "1")
+                        ExportData.ExportCuisiniersToJson($"{fileName}.json");
+                    else if (format == "2")
+                        ExportData.ExportCuisiniersToXml($"{fileName}.xml");
+                    break;
+                case "3": // Plats
+                    if (format == "1")
+                        ExportData.ExportPlatsToJson($"{fileName}.json");
+                    else if (format == "2")
+                        ExportData.ExportPlatsToXml($"{fileName}.xml");
+                    break;
+                case "4": // Commandes
+                    if (format == "1")
+                        ExportData.ExportCommandesToJson($"{fileName}.json");
+                    else if (format == "2")
+                        ExportData.ExportCommandesToXml($"{fileName}.xml");
+                    break;
+                default:
+                    Console.WriteLine("Option invalide.");
+                    break;
+            }
+        }
+    }
+
+  
     static void GérerClients()
     {
         Console.WriteLine("\n--- Tous les Clients ---");
@@ -1538,7 +1589,7 @@ class Statistiques
     // 1. GROUP BY
     static void NbCommandesParCuisinier()
     {
-        using var connection = new MySqlConnection(connectionString) ;
+        using var connection = new MySqlConnection(connectionString);
         connection.Open();
 
         string query = @"
@@ -1647,9 +1698,5 @@ class Statistiques
             Console.WriteLine($"Nom : {reader["nom"]}, Email : {reader["email"]}");
         }
     }
-
 }
-
-
-
 
